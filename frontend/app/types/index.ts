@@ -185,3 +185,19 @@ export interface WorkspaceProductivityData {
   completed: number;
   total: number;
 }
+
+export interface WorkspaceInvitation {
+  _id: string;
+  workspaceId: {
+    _id: string;
+    name: string;
+    description?: string;
+    color: string;
+  };
+  user: User;
+  role: "admin" | "member" | "owner" | "viewer";
+  token: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+}

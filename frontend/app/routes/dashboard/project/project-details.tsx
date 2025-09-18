@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { UseProjectQuery } from "@/hooks/use-project";
+import { useUpdateTaskStatusMutation } from "@/hooks/use-task";
 import { getProjectProgress } from "@/lib";
 import { cn } from "@/lib/utils";
 import type { Project, Task, TaskStatus } from "@/types";
@@ -15,6 +16,7 @@ import { format } from "date-fns";
 import { AlertCircle, Calendar, CheckCircle, Clock } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 
 const ProjectDetails = () => {
   const { projectId, workspaceId } = useParams<{
@@ -246,119 +248,193 @@ const TaskColumn = ({
 };
 
 const TaskCard = ({ task, onClick }: { task: Task; onClick: () => void }) => {
+  const updateTaskStatus = useUpdateTaskStatusMutation();
+
+  const handleStatusUpdate = async (newStatus: TaskStatus) => {
+    try {
+      await updateTaskStatus.mutateAsync({
+        taskId: task._id,
+        status: newStatus,
+      });
+      toast.success(`Task marked as ${newStatus}`);
+    } catch (error) {
+      toast.error("Failed to update task status");
+      console.error("Status update error:", error);
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case "High":
+        return "bg-gradient-to-r from-red-500 to-red-600 text-white shadow-red-200 dark:shadow-red-900/20";
+      case "Medium":
+        return "bg-gradient-to-r from-yellow-500 to-orange-500 text-white shadow-yellow-200 dark:shadow-yellow-900/20";
+      case "Low":
+        return "bg-gradient-to-r from-green-500 to-green-600 text-white shadow-green-200 dark:shadow-green-900/20";
+      default:
+        return "bg-gradient-to-r from-slate-500 to-slate-600 text-white shadow-slate-200 dark:shadow-slate-900/20";
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Done":
+        return "text-green-600 dark:text-green-400";
+      case "In Progress":
+        return "text-blue-600 dark:text-blue-400";
+      default:
+        return "text-slate-600 dark:text-slate-400";
+    }
+  };
+
   return (
     <Card
       onClick={onClick}
-      className="cursor-pointer hover:shadow-md transition-all duration-300 hover:translate-y-1"
+      className="group cursor-pointer bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-0 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden relative"
     >
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/20 to-purple-50/20 dark:from-blue-900/10 dark:to-purple-900/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      
+      <CardHeader className="relative z-10 pb-3">
+        <div className="flex items-start justify-between gap-3">
           <Badge
-            className={
-              task.priority === "High"
-                ? "bg-red-500 text-white"
-                : task.priority === "Medium"
-                ? "bg-orange-500 text-white"
-                : "bg-slate-500 text-white"
-            }
+            className={cn(
+              "px-2 py-1 text-xs font-semibold shadow-sm",
+              getPriorityColor(task.priority)
+            )}
           >
             {task.priority}
           </Badge>
 
-          <div className="flex gap-1">
+          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             {task.status !== "To Do" && (
               <Button
-                variant={"ghost"}
-                size={"icon"}
-                className="size-6"
-                onClick={() => {
-                  console.log("mark as to do");
+                variant="ghost"
+                size="icon"
+                disabled={updateTaskStatus.isPending}
+                className="h-7 w-7 hover:bg-orange-100 dark:hover:bg-orange-900/20 hover:text-orange-600 dark:hover:text-orange-400 transition-colors duration-200 disabled:opacity-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStatusUpdate("To Do");
                 }}
                 title="Mark as To Do"
               >
-                <AlertCircle className={cn("size-4")} />
-                <span className="sr-only">Mark as To Do</span>
+                {updateTaskStatus.isPending ? (
+                  <div className="w-3.5 h-3.5 border border-orange-600 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <AlertCircle className="h-3.5 w-3.5" />
+                )}
               </Button>
             )}
             {task.status !== "In Progress" && (
               <Button
-                variant={"ghost"}
-                size={"icon"}
-                className="size-6"
-                onClick={() => {
-                  console.log("mark as in progress");
+                variant="ghost"
+                size="icon"
+                disabled={updateTaskStatus.isPending}
+                className="h-7 w-7 hover:bg-blue-100 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 disabled:opacity-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStatusUpdate("In Progress");
                 }}
                 title="Mark as In Progress"
               >
-                <Clock className={cn("size-4")} />
-                <span className="sr-only">Mark as In Progress</span>
+                {updateTaskStatus.isPending ? (
+                  <div className="w-3.5 h-3.5 border border-blue-600 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Clock className="h-3.5 w-3.5" />
+                )}
               </Button>
             )}
             {task.status !== "Done" && (
               <Button
-                variant={"ghost"}
-                size={"icon"}
-                className="size-6"
-                onClick={() => {
-                  console.log("mark as done");
+                variant="ghost"
+                size="icon"
+                disabled={updateTaskStatus.isPending}
+                className="h-7 w-7 hover:bg-green-100 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 transition-colors duration-200 disabled:opacity-50"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStatusUpdate("Done");
                 }}
                 title="Mark as Done"
               >
-                <CheckCircle className={cn("size-4")} />
-                <span className="sr-only">Mark as Done</span>
+                {updateTaskStatus.isPending ? (
+                  <div className="w-3.5 h-3.5 border border-green-600 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <CheckCircle className="h-3.5 w-3.5" />
+                )}
               </Button>
             )}
           </div>
         </div>
       </CardHeader>
 
-      <CardContent>
-        <h4 className="ont-medium mb-2">{task.title}</h4>
+      <CardContent className="relative z-10 pt-0">
+        <h4 className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 mb-2 line-clamp-2">
+          {task.title}
+        </h4>
 
         {task.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-2">
+          <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mb-4">
             {task.description}
           </p>
         )}
 
-        <div className="flex items-center justify-between text-sm">
+        {/* Assignees and Due Date */}
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             {task.assignees && task.assignees.length > 0 && (
               <div className="flex -space-x-2">
-                {task.assignees.slice(0, 5).map((member) => (
+                {task.assignees.slice(0, 3).map((member) => (
                   <Avatar
                     key={member._id}
-                    className="relative size-8 bg-gray-700 rounded-full border-2 border-background overflow-hidden"
+                    className="h-7 w-7 border-2 border-white dark:border-slate-800 shadow-sm hover:scale-110 transition-transform duration-200"
                     title={member.name}
                   >
                     <AvatarImage src={member.profilePicture} />
-                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white text-xs font-medium">
+                      {member.name.charAt(0)}
+                    </AvatarFallback>
                   </Avatar>
                 ))}
 
-                {task.assignees.length > 5 && (
-                  <span className="text-xs text-muted-foreground">
-                    + {task.assignees.length - 5}
-                  </span>
+                {task.assignees.length > 3 && (
+                  <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-700 border-2 border-white dark:border-slate-800 flex items-center justify-center shadow-sm">
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                      +{task.assignees.length - 3}
+                    </span>
+                  </div>
                 )}
               </div>
             )}
           </div>
 
           {task.dueDate && (
-            <div className="text-xs text-muted-foreground flex items-center">
-              <Calendar className="size-3 mr-1" />
-              {format(new Date(task.dueDate), "MMM d, yyyy")}
+            <div className="flex items-center space-x-1 text-xs text-slate-500 dark:text-slate-400">
+              <Calendar className="h-3 w-3" />
+              <span className="font-medium">
+                {format(new Date(task.dueDate), "MMM d")}
+              </span>
             </div>
           )}
         </div>
-        {/* 5/10 subtasks */}
-        {task.subtasks && task.subtasks.length > 0 && (
-          <div className="mt-2 text-xs text-muted-foreground">
-            {task.subtasks.filter((subtask) => subtask.completed).length} /{" "}
-            {task.subtasks.length} subtasks
+
+        {/* Status and Subtasks */}
+        <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-700">
+          <div className={cn("text-xs font-medium", getStatusColor(task.status))}>
+            {task.status}
           </div>
-        )}
+          
+          {task.subtasks && task.subtasks.length > 0 && (
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-medium text-slate-900 dark:text-white">
+                {task.subtasks.filter((subtask) => subtask.completed).length}
+              </span>
+              <span className="mx-1">/</span>
+              <span>{task.subtasks.length}</span>
+              <span className="ml-1">subtasks</span>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

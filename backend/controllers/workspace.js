@@ -530,6 +530,140 @@ const acceptInviteByToken = async (req, res) => {
     });
   }
 };
+const getPendingInvitations = async (req, res) => {
+  try {
+    console.log('📬 Fetching pending invitations for user:', req.user._id);
+    
+    // Check if user exists
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        message: "User not authenticated",
+      });
+    }
+
+    const pendingInvitations = await WorkspaceInvite.find({
+      user: req.user._id,
+      expiresAt: { $gt: new Date() },
+    })
+      .populate("workspaceId", "name description color")
+      .populate("user", "name email")
+      .sort({ createdAt: -1 })
+      .lean() // Use lean() for better performance
+      .exec();
+
+    console.log(`✅ Found ${pendingInvitations.length} pending invitations`);
+    res.status(200).json(pendingInvitations);
+  } catch (error) {
+    console.error('❌ Error fetching pending invitations:', error);
+    
+    // Handle specific mongoose errors
+    if (error.name === 'MongooseError' || error.name === 'MongoError') {
+      return res.status(503).json({
+        message: "Database connection issue. Please try again later.",
+      });
+    }
+    
+    res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};
+
+const acceptInvitationById = async (req, res) => {
+  try {
+    const { invitationId } = req.params;
+
+    const invitation = await WorkspaceInvite.findOne({
+      _id: invitationId,
+      user: req.user._id,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!invitation) {
+      return res.status(404).json({
+        message: "Invitation not found or expired",
+      });
+    }
+
+    const workspace = await Workspace.findById(invitation.workspaceId);
+
+    if (!workspace) {
+      return res.status(404).json({
+        message: "Workspace not found",
+      });
+    }
+
+    const isMember = workspace.members.some(
+      (member) => member.user.toString() === req.user._id.toString()
+    );
+
+    if (isMember) {
+      await WorkspaceInvite.deleteOne({ _id: invitationId });
+      return res.status(400).json({
+        message: "You are already a member of this workspace",
+      });
+    }
+
+    workspace.members.push({
+      user: req.user._id,
+      role: invitation.role,
+      joinedAt: new Date(),
+    });
+
+    await workspace.save();
+
+    await Promise.all([
+      WorkspaceInvite.deleteOne({ _id: invitationId }),
+      recordActivity(req.user._id, "joined_workspace", "Workspace", invitation.workspaceId, {
+        description: `Joined ${workspace.name} workspace via invitation`,
+      }),
+    ]);
+
+    res.status(200).json({
+      message: "Invitation accepted successfully",
+      workspace: {
+        _id: workspace._id,
+        name: workspace.name,
+        description: workspace.description,
+        color: workspace.color,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};
+
+const declineInvitation = async (req, res) => {
+  try {
+    const { invitationId } = req.params;
+
+    const invitation = await WorkspaceInvite.findOne({
+      _id: invitationId,
+      user: req.user._id,
+    });
+
+    if (!invitation) {
+      return res.status(404).json({
+        message: "Invitation not found",
+      });
+    }
+
+    await WorkspaceInvite.deleteOne({ _id: invitationId });
+
+    res.status(200).json({
+      message: "Invitation declined successfully",
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Internal server error",
+    });
+  }
+};
+
 export {
   createWorkspace,
   getWorkspaces,
@@ -539,4 +673,7 @@ export {
   inviteUserToWorkspace,
   acceptGenerateInvite,
   acceptInviteByToken,
+  getPendingInvitations,
+  acceptInvitationById,
+  declineInvitation,
 };

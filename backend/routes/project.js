@@ -3,6 +3,7 @@ import authMiddleware from "../middleware/auth-middleware.js";
 import { validateRequest } from "zod-express-middleware";
 import { projectSchema } from "../libs/validate-schema.js";
 import { z } from "zod";
+import mongoose from "mongoose";
 import {
   createProject,
   getProjectDetails,
@@ -11,9 +12,21 @@ import {
 
 const router = express.Router();
 
+// Middleware to validate ObjectId parameters
+const validateObjectId = (paramName) => (req, res, next) => {
+  const id = req.params[paramName];
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      message: `Invalid ${paramName}. Please provide a valid ID.`,
+    });
+  }
+  next();
+};
+
 router.post(
   "/:workspaceId/create-project",
   authMiddleware,
+  validateObjectId('workspaceId'),
   validateRequest({
     params: z.object({
       workspaceId: z.string(),
@@ -26,6 +39,7 @@ router.post(
 router.get(
   "/:projectId",
   authMiddleware,
+  validateObjectId('projectId'),
   validateRequest({
     params: z.object({ projectId: z.string() }),
   }),
@@ -35,6 +49,7 @@ router.get(
 router.get(
   "/:projectId/tasks",
   authMiddleware,
+  validateObjectId('projectId'),
   validateRequest({ params: z.object({ projectId: z.string() }) }),
   getProjectTasks
 );

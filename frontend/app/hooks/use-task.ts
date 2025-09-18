@@ -48,11 +48,23 @@ export const useUpdateTaskStatusMutation = () => {
     mutationFn: (data: { taskId: string; status: TaskStatus }) =>
       updateData(`/tasks/${data.taskId}/status`, { status: data.status }),
     onSuccess: (data: any) => {
+      // Invalidate task-specific queries
       queryClient.invalidateQueries({
         queryKey: ["task", data._id],
       });
       queryClient.invalidateQueries({
         queryKey: ["task-activity", data._id],
+      });
+      // Invalidate project query to update the kanban board
+      queryClient.invalidateQueries({
+        queryKey: ["project", data.project],
+      });
+      // Invalidate workspace stats and other related queries
+      queryClient.invalidateQueries({
+        queryKey: ["workspace-stats"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["my-tasks"],
       });
     },
   });

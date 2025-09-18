@@ -43,18 +43,30 @@ export const SidebarNav = ({
         return (
           <Button
             key={el.href}
-            variant={isActive ? "outline" : "ghost"}
+            variant="ghost"
             className={cn(
-              "justify-start",
-              isActive && "bg-blue-800/20 text-blue-600 font-medium"
+              "justify-start h-11 transition-all duration-200 group relative",
+              isActive
+                ? "bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 text-blue-600 dark:text-blue-400 font-semibold shadow-sm border-r-2 border-blue-500"
+                : "hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white",
+              isCollapsed && "px-3"
             )}
             onClick={handleClick}
           >
-            <Icon className="mr-2 size-4" />
-            {isCollapsed ? (
-              <span className="sr-only">{el.title}</span>
-            ) : (
-              el.title
+            <Icon className={cn(
+              "transition-all duration-200 group-hover:scale-110",
+              isCollapsed ? "size-5" : "mr-3 size-4",
+              isActive && "text-blue-600 dark:text-blue-400"
+            )} />
+            {!isCollapsed && (
+              <span className="font-medium transition-colors duration-200">
+                {el.title}
+              </span>
+            )}
+            {isCollapsed && (
+              <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 dark:bg-slate-700 text-white text-sm rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                {el.title}
+              </div>
             )}
           </Button>
         );

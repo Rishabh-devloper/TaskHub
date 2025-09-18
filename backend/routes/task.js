@@ -1,6 +1,7 @@
 import express from "express";
 
 import { z } from "zod";
+import mongoose from "mongoose";
 import { validateRequest } from "zod-express-middleware";
 import { taskSchema } from "../libs/validate-schema.js";
 import {
@@ -23,6 +24,17 @@ import {
 import authMiddleware from "../middleware/auth-middleware.js";
 
 const router = express.Router();
+
+// Middleware to validate ObjectId parameters
+const validateObjectId = (paramName) => (req, res, next) => {
+  const id = req.params[paramName];
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({
+      message: `Invalid ${paramName}. Please provide a valid ID.`,
+    });
+  }
+  next();
+};
 
 router.post(
   "/:projectId/create-task",
